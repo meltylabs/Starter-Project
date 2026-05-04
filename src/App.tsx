@@ -22,7 +22,6 @@ type Puff = {
 const TRAIN_EMOJIS = ['🚂', '🚃', '🚅', '🚋', '🚄']
 const PUFF_CHARS = ['·', '°', '・', '∘']
 const LANE_COUNT = 5
-const MAX_CONCURRENT = 20
 const DISPATCH_THROTTLE_MS = 120
 const PUFF_COUNT = 4
 const MIN_DURATION_MS = 4500
@@ -107,10 +106,7 @@ function App() {
       startedAt: now,
     }
 
-    setTrains((prev) => {
-      const next = [...prev, train]
-      return next.length > MAX_CONCURRENT ? next.slice(next.length - MAX_CONCURRENT) : next
-    })
+    setTrains((prev) => [...prev, train])
     setCount((c) => c + 1)
     setHasDispatched(true)
     playChoo()
