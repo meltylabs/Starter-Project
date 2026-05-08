@@ -1,80 +1,315 @@
 ---
 name: conductor
-description: Explain how Conductor works — workspaces, branches, workflow, and parallel agents. Use when the user asks about Conductor itself, how to organize work across workspaces, when to run agents in parallel vs. share a workspace, or how the Conductor workflow (create → verify → PR → archive) fits together.
-metadata:
-  source: https://www.conductor.build/docs
-  category: tooling
+description: Build, configure, and troubleshoot Conductor workspaces, repository scripts, conductor.json, managed settings, files to copy, MCP, agent controls, and review workflows. Use when helping someone set up or operate Conductor.
+license: Proprietary
+compatibility: Conductor is a macOS app for running Claude Code and Codex agents locally in isolated git worktree workspaces.
 ---
+
+<!-- conductor-skill-source-sha256: c684c125234673cf71cbd090b5c494ac295b2a1880f88fb1a906319a7e06bcdd -->
 
 # Conductor
 
-Conductor is a Mac app for running coding agents (Claude Code, Codex, and others) in parallel. It gives each stream of work an isolated, git-backed workspace, then helps you verify, review, and ship the result as a pull request.
+Use this skill when helping a user set up, configure, operate, or troubleshoot Conductor.
 
-Authoritative docs: https://www.conductor.build/docs
+Conductor is a macOS app for running multiple coding agents in parallel. Each workspace is a separate git worktree and branch tied to a repository. Conductor currently supports Claude Code and Codex as agent types.
 
-## When to use this skill
+## When to use
 
-Use it when the user asks:
-- "What is Conductor?" / "How does Conductor work?"
-- How to split work across workspaces, or whether to spawn another workspace vs. another agent in the current one
-- How the workflow goes from idea to merged PR
-- When to run agents in parallel and which pattern fits
+Use this skill for questions about:
 
-If the user is asking about Conductor app *settings*, *hooks*, or *permissions*, that's the `update-config` skill instead — this skill covers concepts.
+-   Creating and operating Conductor repositories and workspaces.
+-   Explaining workspaces, branches, git worktrees, and the `.context` directory.
+-   Writing or debugging `conductor.json`.
+-   Writing setup, remote setup, run, and archive scripts.
+-   Configuring files to copy into workspaces.
+-   Configuring app settings, repository settings, and managed settings.
+-   Configuring providers, privacy controls, MCP, slash commands, checkpoints, todos, instruction files, and model controls.
+-   Reviewing, testing, creating pull requests, checking CI, and merging agent work.
+-   Troubleshooting shell behavior, script failures, nested workspace issues, permissions, and privacy behavior.
 
-## Core concepts
+Do not claim support for Windows or Linux. Conductor is a macOS app.
 
-### Workspaces and branches
-- A **workspace** is a separate, git-backed copy of a project for one stream of work.
-- Each workspace maps to **exactly one git branch** with its own working tree, processes, and env vars.
-- Hierarchy: project → repo → many workspaces → one branch each.
-- **Constraint:** a branch can only be checked out in one workspace at a time. To work on the same branch elsewhere, derive a new one: `git checkout -b new-name existing-branch`.
-- Each workspace has a `.context/` directory (gitignored) for cross-agent collaboration files.
+## Core model
 
-Reference: https://www.conductor.build/docs/concepts/workspaces-and-branches
+Keep these product facts straight:
 
-### Workflow
-The end-to-end loop Conductor is built around:
-1. **Break work down** — one reviewable unit (feature, bug, experiment, PR) per workspace.
-2. **Create the workspace** — Conductor provisions files and a branch.
-3. **Run agents** — launch Claude Code / Codex / IDE agents inside the workspace.
-4. **Verify & review** — test in terminal/app, use the **Diff Viewer** to review changes and leave comments, watch the **Checks** tab for git status, CI, and deploys.
-5. **Open a PR** — Conductor helps draft it and tracks GitHub Actions/status checks until merge.
-6. **Archive** — finished workspaces get archived; sidebar stays clean, chat history is preserved.
+-   Conductor runs agents locally on the user's Mac unless the documented cloud workspace path is explicitly involved.
+-   Each repository has a root directory and can have many workspaces.
+-   Each workspace is a separate git worktree with its own branch.
+-   Workspaces are isolated development directories, but agents still run with the user's local permissions unless the user configures stricter controls.
+-   The repo root can contain a checked-in `conductor.json` file for shared repository settings.
+-   Users can also configure personal repository settings in the Conductor app.
+-   Personal Repository Settings on the user's machine override `conductor.json`.
+-   Conductor workspaces include a gitignored `.context` directory for shared agent context.
+-   Conductor currently supports Claude Code and Codex.
 
-Reference: https://www.conductor.build/docs/concepts/workflow
+When answering, prefer concise operational guidance. Preserve exact commands, paths, field names, settings names, environment variable names, and route paths.
 
-### Parallel agents
-Two ways to parallelize:
+## Workspace workflow
 
-**Multiple workspaces** (Cmd+N) — each agent gets its own branch, files, environment. Best for:
-- Independent features or bug fixes
-- Issue fanout (explore several tickets at once, merge what works)
-- Exploratory / potentially-discarded work
-- Tasks needing separate app processes
+Explain the workspace lifecycle in terms of git worktrees and branches:
 
-**One workspace, multiple agents** — agents share the same branch and codebase. Best for:
-- Implementation + concurrent review
-- Code change in one agent, test fixes in another
-- Coupled frontend/backend changes that must merge together
-- Collaborative refinement before opening the PR
+1. The user adds a repository.
+2. Conductor creates a workspace as a new git worktree and branch.
+3. Conductor runs the configured setup script, if one exists.
+4. The user starts one or more agent sessions in the workspace.
+5. The user reviews changes in the diff viewer, runs checks, opens or updates a pull request, and merges when ready.
+6. When the workspace is no longer needed, the user archives it.
 
-Common patterns:
-- **Review-Fix-Test split** — single workspace, one agent reviews while another implements/tests.
-- **Issue fanout** — many workspaces, one per ticket, cherry-pick winners.
-- **Exploratory** — many workspaces for divergent paths, consolidate or archive.
+Important workspace details:
 
-Rule of thumb: **shared workspace when context matters more than isolation; separate workspaces when work should progress independently.**
+-   Setup, run, and archive scripts run from the workspace directory.
+-   Use `CONDUCTOR_ROOT_PATH` when a workspace script needs a file from the repository root.
+-   Use `CONDUCTOR_WORKSPACE_PATH` when a script needs the workspace path.
+-   Use `CONDUCTOR_WORKSPACE_NAME` when a script needs the workspace name.
+-   Use `CONDUCTOR_DEFAULT_BRANCH` when a script needs the default branch name, usually `main`.
+-   Use `CONDUCTOR_PORT` when multiple workspaces need separate local server ports.
+-   Conductor allocates ten ports to each workspace: `CONDUCTOR_PORT` through `CONDUCTOR_PORT+9`.
+-   Use Spotlight testing when a project cannot run cleanly from a workspace directory and needs to execute from the repository root.
 
-Reference: https://www.conductor.build/docs/concepts/parallel-agents
+Relevant docs:
 
-## How to answer
+-   `https://conductor.build/docs/concepts/workspaces-and-branches`
+-   `https://conductor.build/docs/concepts/workflow`
+-   `https://conductor.build/docs/concepts/parallel-agents`
 
-- Lead with the concept that fits the user's question; don't dump all four sections.
-- When recommending parallel vs. shared, ask one clarifying question if intent is unclear (independent tasks vs. coupled work), then give a direct recommendation.
-- Link the relevant doc page above when the user wants to read more.
-- If the user is in the middle of a task and asks an unrelated Conductor question, answer briefly and return to the task.
+## Repository configuration
 
-## Getting help with Conductor itself
+Use `conductor.json` for repository-level settings that teammates should share.
 
-If the user has a feature request, bug, or feedback for the Conductor team, point them to **Help → Send Feedback** in the app.
+Path:
+
+-   `conductor.json`
+
+Scope:
+
+-   Place `conductor.json` in the repository root.
+-   Commit it when teammates should share the configuration.
+
+Precedence:
+
+-   Personal Repository Settings on the user's machine override `conductor.json`.
+-   To use the shared file, clear personal script overrides in Conductor.
+
+Supported `conductor.json` fields:
+
+-   `scripts.setup`: command to run when Conductor creates a workspace.
+-   `scripts.remoteSetup`: command to use instead of `scripts.setup` for remote or cloud workspaces.
+-   `scripts.run`: command to run when the user clicks the Run button.
+-   `scripts.archive`: command to run before Conductor archives a workspace.
+-   `runScriptMode`: `"concurrent"` or `"nonconcurrent"`.
+-   `enterpriseDataPrivacy`: disables features that require external AI providers.
+
+Example:
+
+```json
+{
+    "scripts": {
+        "setup": "pnpm install",
+        "run": "pnpm dev",
+        "archive": "./script/workspace-archive.sh"
+    },
+    "runScriptMode": "concurrent"
+}
+```
+
+Files to copy:
+
+-   Use files to copy for gitignored files such as `.env` files that new workspaces need.
+-   Configure files to copy in repo settings or with a shared `.worktreeinclude` file.
+-   Do not recommend committing secrets.
+
+Relevant docs:
+
+-   `https://conductor.build/docs/reference/conductor-json`
+-   `https://conductor.build/docs/reference/scripts/share-with-teammates`
+-   `https://conductor.build/docs/reference/files-to-copy`
+
+## Scripts
+
+Conductor supports setup, remote setup, run, and archive scripts.
+
+Script facts:
+
+-   Setup, run, and archive scripts run from the workspace directory.
+-   Conductor uses non-interactive shells for scripts.
+-   Although Conductor captures the login shell environment, most commands including setup and run scripts use `zsh`.
+-   Use `CONDUCTOR_ROOT_PATH` when a workspace script needs a file from the repository root.
+-   Use `CONDUCTOR_PORT` when multiple workspaces need separate local server ports.
+-   Conductor allocates ten ports to each workspace: `CONDUCTOR_PORT` through `CONDUCTOR_PORT+9`.
+-   Use `nonconcurrent` run script mode when a project depends on a single fixed port, single local database, or another shared resource.
+-   When a run script starts multiple processes, keep them in the same process group with a tool such as `concurrently` instead of backgrounding commands with `&`.
+-   When Conductor stops a process, it sends `SIGHUP`, waits up to 200ms, then sends `SIGKILL` if the process is still running.
+-   Use Spotlight testing when a project cannot run cleanly from a workspace directory and needs to execute from the repository root.
+
+Environment variables:
+
+-   `CONDUCTOR_WORKSPACE_NAME`: workspace name.
+-   `CONDUCTOR_WORKSPACE_PATH`: workspace path.
+-   `CONDUCTOR_ROOT_PATH`: path to the repository root directory.
+-   `CONDUCTOR_DEFAULT_BRANCH`: name of the default branch, usually `main`.
+-   `CONDUCTOR_PORT`: first port in a range of 10 ports assigned to the workspace.
+
+Relevant docs:
+
+-   `https://conductor.build/docs/reference/scripts`
+-   `https://conductor.build/docs/reference/scripts/setup`
+-   `https://conductor.build/docs/reference/scripts/run`
+-   `https://conductor.build/docs/reference/scripts/spotlight-testing`
+-   `https://conductor.build/docs/reference/shells`
+-   `https://conductor.build/docs/reference/environment-variables`
+
+## Settings
+
+Conductor settings can come from app settings, repository settings, `conductor.json`, and managed settings.
+
+Managed settings:
+
+-   Path: `~/.conductor/settings.json`
+-   Schema: `https://conductor.build/schemas/settings.json`
+-   Status: managed settings are provisional.
+-   Managed values override local database settings.
+-   Managed values disable matching controls in Settings.
+-   Managed values are used when Conductor launches agents.
+
+Managed settings fields from the source bundle:
+
+-   `enterpriseDataPrivacy`: enable enterprise data privacy.
+-   `claudeExecutablePath`: override the Claude Code executable path.
+-   `defaultModel`: set the default model. Supported values are defined by the JSON Schema.
+
+Privacy and permissions:
+
+-   Agents run with the user's local permissions unless the user configures stricter controls.
+-   `enterpriseDataPrivacy` disables features that require external AI providers.
+-   Do not invent additional privacy settings, providers, permissions, or policy behavior.
+
+Relevant docs:
+
+-   `https://conductor.build/docs/reference/settings`
+-   `https://conductor.build/docs/guides/providers`
+-   `https://conductor.build/docs/reference/privacy`
+-   `https://conductor.build/docs/reference/security-and-permissions`
+-   `https://conductor.build/schemas/settings.json`
+
+## Agent behavior
+
+Help users configure the agent workflow that matches the task.
+
+Supported areas:
+
+-   Plan mode.
+-   Fast mode.
+-   Model reasoning controls.
+-   Codex personality.
+-   Checkpoints.
+-   MCP.
+-   Slash commands.
+-   Todos.
+-   Instruction files.
+
+Guidance:
+
+-   Use plan mode when the user wants to review the approach before execution.
+-   Use fast mode when speed matters and the user accepts less interaction.
+-   Use checkpoints when the user wants safer rollback points during agent work.
+-   Use MCP when the user needs agents to access configured external tools or context.
+-   Use slash commands and instruction files to standardize repeated workflows.
+-   Use todos to keep multi-step agent work visible and organized.
+
+Do not invent unsupported agent types, controls, MCP behavior, or provider APIs.
+
+Relevant docs:
+
+-   `https://conductor.build/docs/reference/agent-behavior`
+-   `https://conductor.build/docs/concepts/agent-modes`
+-   `https://conductor.build/docs/reference/checkpoints`
+-   `https://conductor.build/docs/reference/mcp`
+-   `https://conductor.build/docs/reference/slash-commands`
+-   `https://conductor.build/docs/reference/todos`
+
+## Review and merge
+
+Guide users through review as a workflow, not just a final check.
+
+Recommended flow:
+
+1. Inspect changes in the diff viewer.
+2. Run the project checks or the configured run script.
+3. Review agent-created changes for correctness and scope.
+4. Check pull request status, review comments, CI status, and deployments.
+5. Resolve review comments before merge.
+6. Merge when the work is tested and ready.
+
+Focus on:
+
+-   Diff viewer usage.
+-   Checks and test status.
+-   Pull request flow.
+-   Review comments.
+-   CI status.
+-   Deployment status.
+-   Merge readiness.
+
+Relevant docs:
+
+-   `https://conductor.build/docs/guides/review-and-merge`
+-   `https://conductor.build/docs/reference/diff-viewer`
+-   `https://conductor.build/docs/reference/checks`
+
+## Troubleshooting
+
+Start with the smallest observable failure, then check the matching Conductor concept.
+
+Common checks:
+
+-   If setup or run scripts fail, confirm the script runs from the workspace directory.
+-   If shell behavior differs from the user's terminal, remember that Conductor uses non-interactive shells for scripts and most commands use `zsh`.
+-   If a script needs root-repo files, use `CONDUCTOR_ROOT_PATH`.
+-   If local servers collide across workspaces, use `CONDUCTOR_PORT` or switch `runScriptMode` to `nonconcurrent` when the project depends on shared resources.
+-   If multiple processes do not stop cleanly, keep them in the same process group with a tool such as `concurrently`.
+-   If a workspace cannot run from the workspace directory, consider Spotlight testing.
+-   If gitignored files are missing, configure files to copy or `.worktreeinclude`.
+-   If settings appear locked or ignored, check `~/.conductor/settings.json` for managed settings.
+-   If privacy-sensitive features behave differently, check `enterpriseDataPrivacy`.
+-   If permissions surprise the user, explain that agents run with the user's local permissions unless stricter controls are configured.
+-   If the project has nested workspace issues, consult troubleshooting and shell docs before proposing broad changes.
+
+Relevant docs:
+
+-   `https://conductor.build/docs/faq`
+-   `https://conductor.build/docs/troubleshooting/issues`
+-   `https://conductor.build/docs/reference/shells`
+
+## References
+
+Fetch detailed behavior from the docs when needed:
+
+-   Workspaces and branches: `https://conductor.build/docs/concepts/workspaces-and-branches`
+-   Workflow: `https://conductor.build/docs/concepts/workflow`
+-   Parallel agents: `https://conductor.build/docs/concepts/parallel-agents`
+-   `conductor.json`: `https://conductor.build/docs/reference/conductor-json`
+-   Share scripts with teammates: `https://conductor.build/docs/reference/scripts/share-with-teammates`
+-   Scripts: `https://conductor.build/docs/reference/scripts`
+-   Setup scripts: `https://conductor.build/docs/reference/scripts/setup`
+-   Run scripts: `https://conductor.build/docs/reference/scripts/run`
+-   Spotlight testing: `https://conductor.build/docs/reference/scripts/spotlight-testing`
+-   Shells: `https://conductor.build/docs/reference/shells`
+-   Environment variables: `https://conductor.build/docs/reference/environment-variables`
+-   Files to copy: `https://conductor.build/docs/reference/files-to-copy`
+-   Settings: `https://conductor.build/docs/reference/settings`
+-   Providers: `https://conductor.build/docs/guides/providers`
+-   Privacy: `https://conductor.build/docs/reference/privacy`
+-   Security and permissions: `https://conductor.build/docs/reference/security-and-permissions`
+-   Managed settings schema: `https://conductor.build/schemas/settings.json`
+-   Agent behavior: `https://conductor.build/docs/reference/agent-behavior`
+-   Agent modes: `https://conductor.build/docs/concepts/agent-modes`
+-   Checkpoints: `https://conductor.build/docs/reference/checkpoints`
+-   MCP: `https://conductor.build/docs/reference/mcp`
+-   Slash commands: `https://conductor.build/docs/reference/slash-commands`
+-   Todos: `https://conductor.build/docs/reference/todos`
+-   Review and merge: `https://conductor.build/docs/guides/review-and-merge`
+-   Diff viewer: `https://conductor.build/docs/reference/diff-viewer`
+-   Checks: `https://conductor.build/docs/reference/checks`
+-   FAQ: `https://conductor.build/docs/faq`
+-   Troubleshooting: `https://conductor.build/docs/troubleshooting/issues`

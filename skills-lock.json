@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "conductor": {
+      "source": "conductor.build",
+      "sourceType": "well-known",
+      "computedHash": "8e569de473ace71625b35389453d8ef84be0bd19cc15094a86fa3b66763e5506"
+    }
+  }
+}
