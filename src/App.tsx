@@ -52,7 +52,7 @@ function App() {
   const chooRef = useRef<HTMLAudioElement | null>(null)
   const whistleRef = useRef<HTMLAudioElement | null>(null)
   const mutedRef = useRef(muted)
-  const milestoneRef = useRef<number | null>(null)
+  const lastMilestoneRef = useRef(0)
 
   useEffect(() => {
     mutedRef.current = muted
@@ -103,7 +103,6 @@ function App() {
   }, [])
 
   const dispatch = useCallback(() => {
-    if (milestoneRef.current !== null) return
     const now = performance.now()
     if (now - lastDispatchRef.current < DISPATCH_THROTTLE_MS) return
     lastDispatchRef.current = now
@@ -126,15 +125,7 @@ function App() {
     }
 
     setTrains((prev) => [...prev, train])
-    setCount((c) => {
-      const next = c + 1
-      if (next % MILESTONE_EVERY === 0) {
-        milestoneRef.current = next
-        setMilestone(next)
-        playWhistle()
-      }
-      return next
-    })
+    setCount((c) => c + 1)
     setHasDispatched(true)
     playChoo()
 
@@ -152,16 +143,23 @@ function App() {
         ])
       }, t)
     }
-  }, [playChoo, playWhistle])
+  }, [playChoo])
 
   useEffect(() => {
     if (milestone === null) return
     const t = setTimeout(() => {
-      milestoneRef.current = null
       setMilestone(null)
     }, MILESTONE_DURATION_MS)
     return () => clearTimeout(t)
   }, [milestone])
+
+  useEffect(() => {
+    if (count === 0 || count % MILESTONE_EVERY !== 0) return
+    if (lastMilestoneRef.current === count) return
+    lastMilestoneRef.current = count
+    setMilestone(count)
+    playWhistle()
+  }, [count, playWhistle])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
