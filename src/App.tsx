@@ -39,6 +39,10 @@ function App() {
     if (typeof localStorage === 'undefined') return false
     return localStorage.getItem('wtc:muted') === '1'
   })
+  const [night, setNight] = useState<boolean>(() => {
+    if (typeof localStorage === 'undefined') return false
+    return localStorage.getItem('wtc:night') === '1'
+  })
   const [hasDispatched, setHasDispatched] = useState(false)
 
   const nextIdRef = useRef(1)
@@ -52,6 +56,11 @@ function App() {
     mutedRef.current = muted
     localStorage.setItem('wtc:muted', muted ? '1' : '0')
   }, [muted])
+
+  useEffect(() => {
+    document.body.classList.toggle('night', night)
+    localStorage.setItem('wtc:night', night ? '1' : '0')
+  }, [night])
 
   useEffect(() => {
     if (chooRef.current) return
@@ -134,6 +143,8 @@ function App() {
         dispatch()
       } else if (e.key === 'm' || e.key === 'M') {
         setMuted((m) => !m)
+      } else if (e.key === 'n' || e.key === 'N') {
+        setNight((n) => !n)
       }
     }
     window.addEventListener('keydown', onKey)
@@ -142,6 +153,15 @@ function App() {
 
   return (
     <main onClick={dispatch}>
+      {night && (
+        <div className="night-sky" aria-hidden="true">
+          <span className="moon" role="img" aria-label="moon">🌙</span>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <span key={i} className={`star star-${i}`}>✦</span>
+          ))}
+        </div>
+      )}
+
       <div className={`hero${hasDispatched ? ' dispatched' : ''}`} aria-hidden={hasDispatched}>
         <span className="train-emoji" role="img" aria-label="train">🚂</span>
         <span className="tagline">click anywhere to dispatch a train</span>
@@ -171,6 +191,18 @@ function App() {
           {p.char}
         </span>
       ))}
+
+      <button
+        className="night-toggle"
+        onClick={(e) => {
+          e.stopPropagation()
+          setNight((n) => !n)
+        }}
+        aria-label={night ? 'Switch to day mode' : 'Switch to night mode'}
+        aria-pressed={night}
+      >
+        {night ? '☀️' : '🌙'}
+      </button>
 
       <button
         className="mute-toggle"
