@@ -26,6 +26,9 @@ const DISPATCH_THROTTLE_MS = 120
 const PUFF_COUNT = 4
 const MIN_DURATION_MS = 4500
 const MAX_DURATION_MS = 7500
+const MILESTONE_EVERY = 10
+const MILESTONE_DURATION_MS = 2500
+const MILESTONE_SPARKS = ['🎆', '🎇', '✨', '🎆', '🎇', '✨', '🎆', '🎇', '✨', '🎆', '🎇', '✨']
 
 function pick<T>(arr: readonly T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
@@ -40,13 +43,16 @@ function App() {
     return localStorage.getItem('wtc:muted') === '1'
   })
   const [hasDispatched, setHasDispatched] = useState(false)
+  const [milestone, setMilestone] = useState<number | null>(null)
 
   const nextIdRef = useRef(1)
   const lastDispatchRef = useRef(0)
   const lastLaneRef = useRef(-1)
   const lastDirRef = useRef<Direction>('rtl')
   const chooRef = useRef<HTMLAudioElement | null>(null)
+  const whistleRef = useRef<HTMLAudioElement | null>(null)
   const mutedRef = useRef(muted)
+  const milestoneRef = useRef<number | null>(null)
 
   useEffect(() => {
     mutedRef.current = muted
@@ -58,6 +64,9 @@ function App() {
     const choo = new Audio('/choo-choo.mp3')
     choo.preload = 'auto'
     chooRef.current = choo
+    const whistle = new Audio('/sf-muni-inbound-train-chime.mp3')
+    whistle.preload = 'auto'
+    whistleRef.current = whistle
   }, [])
 
   useEffect(() => {
@@ -76,6 +85,15 @@ function App() {
     node.play().catch(() => {})
   }, [])
 
+  const playWhistle = useCallback(() => {
+    if (mutedRef.current) return
+    const whistle = whistleRef.current
+    if (!whistle) return
+    const node = whistle.cloneNode(true) as HTMLAudioElement
+    node.volume = 0.55
+    node.play().catch(() => {})
+  }, [])
+
   const removeTrain = useCallback((id: number) => {
     setTrains((prev) => prev.filter((t) => t.id !== id))
   }, [])
@@ -85,6 +103,7 @@ function App() {
   }, [])
 
   const dispatch = useCallback(() => {
+    if (milestoneRef.current !== null) return
     const now = performance.now()
     if (now - lastDispatchRef.current < DISPATCH_THROTTLE_MS) return
     lastDispatchRef.current = now
@@ -107,7 +126,15 @@ function App() {
     }
 
     setTrains((prev) => [...prev, train])
-    setCount((c) => c + 1)
+    setCount((c) => {
+      const next = c + 1
+      if (next % MILESTONE_EVERY === 0) {
+        milestoneRef.current = next
+        setMilestone(next)
+        playWhistle()
+      }
+      return next
+    })
     setHasDispatched(true)
     playChoo()
 
@@ -125,7 +152,16 @@ function App() {
         ])
       }, t)
     }
-  }, [playChoo])
+  }, [playChoo, playWhistle])
+
+  useEffect(() => {
+    if (milestone === null) return
+    const t = setTimeout(() => {
+      milestoneRef.current = null
+      setMilestone(null)
+    }, MILESTONE_DURATION_MS)
+    return () => clearTimeout(t)
+  }, [milestone])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -183,6 +219,20 @@ function App() {
       >
         {muted ? '🔇' : '🔊'}
       </button>
+
+      {milestone !== null && (
+        <div className="milestone" role="status" aria-live="assertive">
+          <div className="milestone-burst">
+            {MILESTONE_SPARKS.map((c, i) => (
+              <span key={i} className="milestone-spark" style={{ ['--i' as string]: i }}>
+                {c}
+              </span>
+            ))}
+          </div>
+          <div className="milestone-count">{milestone}</div>
+          <div className="milestone-label">All aboard! {milestone} trains dispatched.</div>
+        </div>
+      )}
 
       <div className="counter" aria-live="polite">
         {count} {count === 1 ? 'train' : 'trains'} dispatched
