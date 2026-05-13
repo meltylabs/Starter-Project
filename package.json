@@ -6,10 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "inspect:mcp": "npx @mcpjam/inspector@latest",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@appsignal/javascript": "^1.6.1",
     "react": "^19.2.5",
     "react-dom": "^19.2.5"
   },
