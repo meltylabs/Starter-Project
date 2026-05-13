@@ -45,6 +45,14 @@ Run lint checks:
 npm run lint
 ```
 
+Start MCPJam Inspector for HTTP/S or local STDIO MCP server testing:
+
+```sh
+npm run inspect:mcp
+```
+
+The inspector opens at `http://127.0.0.1:6274`. Use the UI to choose either a remote `https://...` MCP endpoint or a local STDIO command. Keep tokens and API keys in your shell environment or a gitignored local env file, not in the command history.
+
 ## Project Structure
 
 - `src/App.tsx` contains the starter app UI and interactions.
