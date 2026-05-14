@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { type CSSProperties, useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
 
 type Direction = 'ltr' | 'rtl'
@@ -19,8 +19,54 @@ type Puff = {
   char: string
 }
 
+type Celebration = {
+  id: number
+  count: number
+}
+
+type ConfettiPiece = {
+  id: number
+  x: number
+  drift: number
+  delayMs: number
+  durationMs: number
+  rotation: number
+  color: string
+  shape: 'strip' | 'square' | 'circle'
+}
+
+type ConfettiStyle = CSSProperties & {
+  '--confetti-x': string
+  '--confetti-drift': string
+  '--confetti-color': string
+  '--confetti-rotation': string
+}
+
 const TRAIN_EMOJIS = ['🚂', '🚃', '🚅', '🚋', '🚄']
 const PUFF_CHARS = ['·', '°', '・', '∘']
+const CONFETTI_COLORS = [
+  '#db4437',
+  '#f4b400',
+  '#0f9d58',
+  '#4285f4',
+  '#ab47bc',
+  '#00acc1',
+  '#ff7043',
+  '#7cb342',
+]
+const CONFETTI_PIECES: ConfettiPiece[] = Array.from({ length: 84 }, (_, i) => {
+  const wave = Math.sin(i * 2.17)
+  return {
+    id: i,
+    x: (i * 37) % 100,
+    drift: Math.round(wave * 34),
+    delayMs: (i % 14) * 72,
+    durationMs: 2100 + (i % 9) * 130,
+    rotation: ((i * 53) % 360) - 180,
+    color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+    shape: i % 5 === 0 ? 'circle' : i % 3 === 0 ? 'square' : 'strip',
+  }
+})
 const LANE_COUNT = 5
 const DISPATCH_THROTTLE_MS = 120
 const PUFF_COUNT = 4
@@ -35,6 +81,7 @@ function App() {
   const [trains, setTrains] = useState<Train[]>([])
   const [puffs, setPuffs] = useState<Puff[]>([])
   const [count, setCount] = useState(0)
+  const [celebration, setCelebration] = useState<Celebration | null>(null)
   const [muted, setMuted] = useState<boolean>(() => {
     if (typeof localStorage === 'undefined') return false
     return localStorage.getItem('wtc:muted') === '1'
@@ -42,6 +89,7 @@ function App() {
   const [hasDispatched, setHasDispatched] = useState(false)
 
   const nextIdRef = useRef(1)
+  const dispatchCountRef = useRef(0)
   const lastDispatchRef = useRef(0)
   const lastLaneRef = useRef(-1)
   const lastDirRef = useRef<Direction>('rtl')
@@ -107,7 +155,12 @@ function App() {
     }
 
     setTrains((prev) => [...prev, train])
-    setCount((c) => c + 1)
+    const nextCount = dispatchCountRef.current + 1
+    dispatchCountRef.current = nextCount
+    setCount(nextCount)
+    if (nextCount % 10 === 0) {
+      setCelebration({ id: nextIdRef.current++, count: nextCount })
+    }
     setHasDispatched(true)
     playChoo()
 
@@ -171,6 +224,65 @@ function App() {
           {p.char}
         </span>
       ))}
+
+      {celebration && (
+        <div
+          key={celebration.id}
+          className="celebration"
+          role="status"
+          aria-live="polite"
+          onAnimationEnd={(event) => {
+            if (event.currentTarget === event.target) setCelebration(null)
+          }}
+        >
+          <div className="celebration-wash" aria-hidden="true" />
+          <div className="celebration-spotlight left" aria-hidden="true" />
+          <div className="celebration-spotlight right" aria-hidden="true" />
+          <div className="confetti-field" aria-hidden="true">
+            {CONFETTI_PIECES.map((piece) => {
+              const style: ConfettiStyle = {
+                '--confetti-x': `${piece.x}vw`,
+                '--confetti-drift': `${piece.drift}vw`,
+                '--confetti-color': piece.color,
+                '--confetti-rotation': `${piece.rotation}deg`,
+                animationDelay: `${piece.delayMs}ms`,
+                animationDuration: `${piece.durationMs}ms`,
+              }
+
+              return (
+                <span
+                  key={piece.id}
+                  className={`confetti ${piece.shape}`}
+                  style={style}
+                />
+              )
+            })}
+          </div>
+          <div className="celebration-burst" aria-hidden="true">
+            <span>✦</span>
+            <span>★</span>
+            <span>✶</span>
+            <span>✹</span>
+            <span>✦</span>
+            <span>★</span>
+            <span>✷</span>
+            <span>✸</span>
+          </div>
+          <div className="celebration-stage">
+            <span className="celebration-kicker">dispatch milestone</span>
+            <span className="celebration-count">{celebration.count}</span>
+            <span className="celebration-copy">trains dispatched</span>
+            <span className="celebration-train" aria-hidden="true">🚆</span>
+            <div className="celebration-fleet" aria-hidden="true">
+              <span>🚂</span>
+              <span>🚃</span>
+              <span>🚋</span>
+              <span>🚄</span>
+              <span>🚅</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       <button
         className="mute-toggle"
