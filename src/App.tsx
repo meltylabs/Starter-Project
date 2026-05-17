@@ -21,6 +21,9 @@ type Puff = {
 
 const TRAIN_EMOJIS = ['🚂', '🚃', '🚅', '🚋', '🚄']
 const PUFF_CHARS = ['·', '°', '・', '∘']
+const CONFETTI_CHARS = ['🎉', '✨', '🎊', '⭐', '🚂', '💫']
+const CONFETTI_COUNT = 24
+const CELEBRATION_MS = 2200
 const LANE_COUNT = 5
 const DISPATCH_THROTTLE_MS = 120
 const PUFF_COUNT = 4
@@ -31,10 +34,23 @@ function pick<T>(arr: readonly T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
 }
 
+type Confetti = {
+  id: number
+  left: number
+  delayMs: number
+  durationMs: number
+  drift: number
+  char: string
+}
+
 function App() {
   const [trains, setTrains] = useState<Train[]>([])
   const [puffs, setPuffs] = useState<Puff[]>([])
   const [count, setCount] = useState(0)
+  const [celebration, setCelebration] = useState<{
+    total: number
+    pieces: Confetti[]
+  } | null>(null)
   const [muted, setMuted] = useState<boolean>(() => {
     if (typeof localStorage === 'undefined') return false
     return localStorage.getItem('wtc:muted') === '1'
@@ -66,6 +82,12 @@ function App() {
         ? 'welcome to conductor'
         : `welcome to conductor (${count})`
   }, [count])
+
+  useEffect(() => {
+    if (!celebration) return
+    const t = setTimeout(() => setCelebration(null), CELEBRATION_MS)
+    return () => clearTimeout(t)
+  }, [celebration])
 
   const playChoo = useCallback(() => {
     if (mutedRef.current) return
@@ -107,7 +129,21 @@ function App() {
     }
 
     setTrains((prev) => [...prev, train])
-    setCount((c) => c + 1)
+    setCount((c) => {
+      const next = c + 1
+      if (next % 10 === 0) {
+        const pieces: Confetti[] = Array.from({ length: CONFETTI_COUNT }, () => ({
+          id: nextIdRef.current++,
+          left: Math.random() * 100,
+          delayMs: Math.random() * 400,
+          durationMs: 1400 + Math.random() * 700,
+          drift: (Math.random() - 0.5) * 30,
+          char: pick(CONFETTI_CHARS),
+        }))
+        setCelebration({ total: next, pieces })
+      }
+      return next
+    })
     setHasDispatched(true)
     playChoo()
 
@@ -187,6 +223,29 @@ function App() {
       <div className="counter" aria-live="polite">
         {count} {count === 1 ? 'train' : 'trains'} dispatched
       </div>
+
+      {celebration && (
+        <div className="celebration" aria-live="assertive">
+          {celebration.pieces.map((p) => (
+            <span
+              key={p.id}
+              className="confetti"
+              style={{
+                left: `${p.left}vw`,
+                animationDelay: `${p.delayMs}ms`,
+                animationDuration: `${p.durationMs}ms`,
+                '--drift': `${p.drift}vw`,
+              } as React.CSSProperties}
+            >
+              {p.char}
+            </span>
+          ))}
+          <div className="milestone">
+            <div className="milestone-count">{celebration.total}</div>
+            <div className="milestone-label">trains dispatched! 🎉</div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
